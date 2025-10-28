@@ -2,7 +2,7 @@
 
 ## Running Docker Image
 
-The image offers GPU support. You build the image by executing:
+We provide a Docker image with Pytorch and GPU support. You may build the image by executing:
 
 ```bash
 docker build -t fhe-dim-reduction .
@@ -14,3 +14,4 @@ docker run -it --rm --gpus all -v $(pwd):/app fhe-dim-reduction
 ```
 
 Please, ensure your NVIDIA drivers are updated and Docker is installed.
+The image runs on CUDA 13.0. If compatibility issues arise, you may find versions which match your drivers [here](https://hub.docker.com/r/pytorch/pytorch/).

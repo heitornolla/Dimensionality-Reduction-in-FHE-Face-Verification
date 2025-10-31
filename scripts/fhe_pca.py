@@ -51,7 +51,7 @@ def main(csv_path: str):
     cc, keys = setup_fhe_context()
 
     # Test multiple PCA dimensions
-    dims_to_test = [256, 128, 64, 32, 16, 8, 4]
+    dims_to_test = [512, 256, 128, 64, 32, 16, 8, 4]
     print(f"\nRunning for dimensions: {dims_to_test}")
 
     for target_dim in dims_to_test:

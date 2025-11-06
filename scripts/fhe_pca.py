@@ -15,7 +15,7 @@ from baseline_verification import (
     set_deterministic, find_optimal_threshold
 )
 
-from fhe_no_reduction import (
+from scripts.fhe_baseline import (
     get_baseline_embeddings, setup_fhe_context, fhe_distance, 
 )
 

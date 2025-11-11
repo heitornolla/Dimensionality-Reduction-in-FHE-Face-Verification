@@ -181,6 +181,5 @@ def main():
     print(f"  Optimal threshold of {thresh:.6f}")
 
 
-
 if __name__ == "__main__":
     main()

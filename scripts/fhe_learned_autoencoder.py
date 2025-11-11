@@ -3,6 +3,10 @@ Full experiment: FHE face verification + Autoencoder dimensionality reduction sw
 Runs multiple AE target dimensions and logs results to CSV.
 
 This is a non-linear, unsupervised alternative to PCA.
+
+CORRECTED:
+- Trains AE on the 'train' subset (from get_training_data).
+- Encodes and evaluates on the 'test' subset (from get_baseline_embeddings).
 """
 
 import os
@@ -16,10 +20,13 @@ from sklearn.metrics import accuracy_score
 from tqdm import tqdm
 
 from baseline_verification import (
-    set_deterministic, find_optimal_threshold, get_device
+    set_deterministic, find_optimal_threshold, get_device,
+    get_model, get_transform
 )
+
 from fhe_baseline import (
-    get_baseline_embeddings, setup_fhe_context, fhe_distance, 
+    get_training_data, get_test_embeddings, 
+    setup_fhe_context, fhe_distance, 
 )
 
 
@@ -30,6 +37,7 @@ class Autoencoder(nn.Module):
     Due to the way it is structured, 
     we evaluate dims from 128 to 4.
     """
+    
     def __init__(self, input_dim, latent_dim):
         super().__init__()
         
@@ -65,35 +73,34 @@ def train_autoencoder(
     input_dim: int, 
     latent_dim: int, 
     device: torch.device,
-    epochs: int = 30,
+    epochs: int = 30, 
     batch_size: int = 128
 ) -> nn.Module:
     """
-    Trains a new Autoencoder on the provided data and returns the trained encoder.
+    Trains a new Autoencoder on the provided data and returns the trained ENCODER.
     """
+
     data_tensor = torch.tensor(data_np, dtype=torch.float32)
     dataset = TensorDataset(data_tensor)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     
     model = Autoencoder(input_dim, latent_dim).to(device)
-    criterion = nn.MSELoss()
+    criterion = nn.MSELoss() 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     
     model.train()
-    for epoch in range(epochs):
+    print(f"  Training AE for {epochs} epochs...")
+    for _ in range(epochs):
         for batch in loader:
             inputs = batch[0].to(device)
-            
             reconstructed = model(inputs)
-            
             loss = criterion(reconstructed, inputs)
             
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        if (epoch + 1) == epochs:
-            print(f"  AE training complete. Final MSE loss: {loss.item():.6f}")
 
+    print(f"  AE training complete. Final MSE loss: {loss.item():.6f}")
     return model.encoder.eval()
 
 
@@ -101,17 +108,17 @@ def main(csv_path: str):
     set_deterministic(42)
     device = get_device()
     
-    # Get the 6,000 test pairs and labels.
-    # emb1 and emb2 are PyTorch Tensors.
-    labels, emb1_tensor, emb2_tensor = get_baseline_embeddings()
-    orig_dim = emb1_tensor.shape[1] # 512
+    model = get_model(device)
+    transform = get_transform(160)
 
-    emb1_np = emb1_tensor.numpy()
-    emb2_np = emb2_tensor.numpy()
+    train_data_np = get_training_data(model, device, transform)
+    orig_dim = train_data_np.shape[1]
+
+    labels, emb1_np, emb2_np = get_test_embeddings(model, device, transform)
     
-    # For a just comparison, we train our AE on the same data PCA was fit on.
-    all_embs_np = np.vstack((emb1_np, emb2_np))
-    
+    emb1_tensor = torch.tensor(emb1_np, dtype=torch.float32).to(device)
+    emb2_tensor = torch.tensor(emb2_np, dtype=torch.float32).to(device)
+
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     
     header = [
@@ -125,31 +132,29 @@ def main(csv_path: str):
         with open(csv_path, "w", newline="") as f:
             csv.writer(f).writerow(header)
     
-    print("Setting FHE context")
+    print("\nSetting FHE context")
     cc, keys = setup_fhe_context()
 
     dims_to_test = [128, 64, 32, 16, 8, 4]
     print(f"\nRunning for dimensions: {dims_to_test}")
 
     for target_dim in dims_to_test:
-        print(f"\nAutoencoder {orig_dim} -> {target_dim}")
+        print(f"\nAutoencoder {orig_dim} → {target_dim}")
         
-        # Similar to PCA logic, train a new AE for this target dimension
-        encoder = train_autoencoder(all_embs_np, orig_dim, target_dim, device)
+        encoder = train_autoencoder(train_data_np, orig_dim, target_dim, device)
         
-        # Use the trained encoder to reduce our 6,000 pairs
         with torch.no_grad():
-            emb1_reduced_t = encoder(emb1_tensor.to(device))
-            emb2_reduced_t = encoder(emb2_tensor.to(device))
+            emb1_reduced_t = encoder(emb1_tensor)
+            emb2_reduced_t = encoder(emb2_tensor)
             
         emb1_reduced = emb1_reduced_t.cpu().numpy()
         emb2_reduced = emb2_reduced_t.cpu().numpy()
         
-        emb_dim = emb1_reduced.shape[1]
-
+        emb_dim = emb1_reduced.shape[1] 
+        
         print("  Encrypting embeddings")
-        ct_db = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in emb1_reduced]
-        ct_probe = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in emb2_reduced]
+        ct_db = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb1_reduced)]
+        ct_probe = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb2_reduced)]
 
         print("  Running encrypted matching")
         distances = []
@@ -159,7 +164,7 @@ def main(csv_path: str):
             ct_res = fhe_distance(cc, ct_db[i], ct_probe[i], sum_slots=emb_dim)
             pt_res = cc.Decrypt(keys.secretKey, ct_res)
             total_time += time.perf_counter() - t0
-            distances.append(float(pt_res.GetRealPackedValue()[0]))
+            distances.append(float(pt_res.GetRealPackedValue()[0])) 
 
         avg_time_ms = (total_time / len(labels)) * 1000
 

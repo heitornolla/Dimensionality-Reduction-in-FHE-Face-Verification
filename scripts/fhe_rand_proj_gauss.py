@@ -15,16 +15,14 @@ from baseline_verification import (
     set_deterministic, find_optimal_threshold
 )
 
-from scripts.fhe_baseline import (
-    get_baseline_embeddings, setup_fhe_context, fhe_distance,
+from fhe_baseline import (
+    get_test_embeddings, setup_fhe_context, fhe_distance,
 )
 
 
 def main(csv_path: str):
     set_deterministic(42)
-    labels, emb1, emb2 = get_baseline_embeddings()
-    emb1 = emb1.numpy()
-    emb2 = emb2.numpy()
+    labels, emb1, emb2 = get_test_embeddings()
 
     orig_dim = emb1.shape[1]
     print(f"Original embedding dimension: {orig_dim}")
@@ -57,8 +55,8 @@ def main(csv_path: str):
 
         # Encrypt reduced embeddings
         print("  Encrypting embeddings")
-        ct_db = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in emb1_reduced]
-        ct_probe = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in emb2_reduced]
+        ct_db = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb1_reduced)]
+        ct_probe = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb2_reduced)]
 
         # Encrypted matching
         print("  Running encrypted matching")

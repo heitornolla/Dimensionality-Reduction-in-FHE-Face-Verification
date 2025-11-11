@@ -15,24 +15,23 @@ from baseline_verification import (
     set_deterministic, find_optimal_threshold
 )
 
-from scripts.fhe_baseline import (
-    get_baseline_embeddings, setup_fhe_context, fhe_distance, 
+from fhe_baseline import (
+    get_test_embeddings, setup_fhe_context, fhe_distance, 
 )
 
 
 def main(csv_path: str):
     set_deterministic(42)
-    labels, emb1, emb2 = get_baseline_embeddings()
+    labels, emb1, emb2 = get_test_embeddings()
 
     orig_dim = emb1.shape[1]
 
     # Fit PCA once on full embedding space
-    print("Fitting PCA")
+    print("Fitting RSVD")
     all_embs_np = np.vstack((emb1, emb2))
 
     pca_full = PCA(n_components=orig_dim, random_state=42)
     pca_full.fit(all_embs_np)
-    explained_ratios = np.cumsum(pca_full.explained_variance_ratio_)
 
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     header = [
@@ -55,7 +54,7 @@ def main(csv_path: str):
     print(f"\nRunning for dimensions: {dims_to_test}")
 
     for target_dim in dims_to_test:
-        print(f"\nPCA {orig_dim} to {target_dim}")
+        print(f"RSVD {orig_dim} to {target_dim}")
         pca = PCA(n_components=target_dim, svd_solver='randomized', random_state=42)
         pca.fit(all_embs_np)
         
@@ -69,8 +68,8 @@ def main(csv_path: str):
 
         # Encrypt reduced embeddings
         print("  Encrypting embeddings")
-        ct_db = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in emb1_reduced]
-        ct_probe = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in emb2_reduced]
+        ct_db = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb1_reduced)]
+        ct_probe = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb2_reduced)]
 
         # Encrypted matching
         print("  Running encrypted matching")
@@ -99,7 +98,7 @@ def main(csv_path: str):
         with open(csv_path, "a", newline="") as f:
             csv.writer(f).writerow(row)
 
-        print(f"  FHE PCA Matching Results for size {target_dim}:")
+        print(f"  FHE RSVD Matching Results for size {target_dim}:")
         print(f"  Average matching time per pair: {avg_time_ms:.3f} ms")
         print(f"  Accuracy of {acc*100:.2f}%")
         print(f"  Optimal threshold of {opt_thresh:.6f}")
@@ -107,5 +106,5 @@ def main(csv_path: str):
 
 
 if __name__ == "__main__":
-    output_csv = f"{os.path.abspath('./')}/results/fhe_pca_results.csv"
+    output_csv = f"{os.path.abspath('./')}/results/fhe_rsvd_results.csv"
     main(output_csv)

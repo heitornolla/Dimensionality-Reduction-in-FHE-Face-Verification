@@ -1,6 +1,9 @@
 """
 Full experiment: FHE face verification + PCA dimensionality reduction sweep.
 Runs multiple PCA target dimensions and logs results to CSV.
+
+- Fits PCA on the train subset.
+- Transforms and evaluates on the test subset.
 """
 
 import os
@@ -12,27 +15,32 @@ from sklearn.metrics import accuracy_score
 from tqdm import tqdm
 
 from baseline_verification import (
-    set_deterministic, find_optimal_threshold
+    set_deterministic, find_optimal_threshold, get_device, 
+    get_model, get_transform
 )
 
-from scripts.fhe_baseline import (
-    get_baseline_embeddings, setup_fhe_context, fhe_distance, 
+from fhe_baseline import (
+    get_training_data, get_test_embeddings, 
+    setup_fhe_context, fhe_distance, 
 )
 
 
 def main(csv_path: str):
     set_deterministic(42)
-    labels, emb1, emb2 = get_baseline_embeddings()
+    
+    device = get_device()
+    model = get_model(device)
+    transform = get_transform(160)
 
-    orig_dim = emb1.shape[1]
-
-    # Fit PCA once on full embedding space
-    print("Fitting PCA")
-    all_embs_np = np.vstack((emb1, emb2))
-
+    train_data_np = get_training_data(model, device, transform)
+    
+    orig_dim = train_data_np.shape[1]
+    
+    print("Fitting PCA on TRAINING data...")
     pca_full = PCA(n_components=orig_dim, random_state=42)
-    pca_full.fit(all_embs_np)
-    explained_ratios = np.cumsum(pca_full.explained_variance_ratio_)
+    pca_full.fit(train_data_np)
+
+    labels, emb1_np, emb2_np = get_test_embeddings(model, device, transform)
 
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     header = [
@@ -47,21 +55,24 @@ def main(csv_path: str):
         with open(csv_path, "w", newline="") as f:
             csv.writer(f).writerow(header)
     
-    print("Setting FHE context")
+    print("\nSetting FHE context")
     cc, keys = setup_fhe_context()
 
     # Test multiple PCA dimensions
     dims_to_test = [512, 256, 128, 64, 32, 16, 8, 4]
-    print(f"\nRunning for dimensions: {dims_to_test}")
+    print(f"\nRunning PCA for dimensions: {dims_to_test}")
 
     for target_dim in dims_to_test:
-        print(f"\nPCA {orig_dim} to {target_dim}")
-        pca = PCA(n_components=target_dim, random_state=42)
-        pca.fit(all_embs_np)
+        print(f"\nPCA {orig_dim} → {target_dim}")
         
-        emb1_reduced = pca.transform(emb1)
-        emb2_reduced = pca.transform(emb2)
-
+        # We need to re-fit a new PCA model for this dimension
+        print("  Fitting PCA...")
+        pca = PCA(n_components=target_dim, random_state=42)
+        pca.fit(train_data_np)
+        
+        emb1_reduced = pca.transform(emb1_np)
+        emb2_reduced = pca.transform(emb2_np)
+        
         explained_var = np.sum(pca.explained_variance_ratio_) * 100
         print(f"  Explained variance: {explained_var:.2f}%")
 
@@ -69,8 +80,8 @@ def main(csv_path: str):
 
         # Encrypt reduced embeddings
         print("  Encrypting embeddings")
-        ct_db = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in emb1_reduced]
-        ct_probe = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in emb2_reduced]
+        ct_db = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb1_reduced)]
+        ct_probe = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb2_reduced)]
 
         # Encrypted matching
         print("  Running encrypted matching")
@@ -107,5 +118,9 @@ def main(csv_path: str):
 
 
 if __name__ == "__main__":
-    output_csv = f"{os.path.abspath('./')}/results/fhe_pca_results.csv"
+    output_dir = os.path.join(os.path.abspath('.'), "results")
+    os.makedirs(output_dir, exist_ok=True)
+    output_csv = os.path.join(output_dir, "fhe_pca_results.csv")
+    if os.path.exists(output_csv):
+        os.remove(output_csv)
     main(output_csv)

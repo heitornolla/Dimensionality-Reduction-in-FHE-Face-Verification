@@ -1,5 +1,8 @@
 """
-Full experiment: FHE face verification + Sparse Random Projection (SRP) dimensionality reduction sweep.
+Author: Heitor Pavani Nolla
+All rights reserved
+
+FHE face verification + Sparse Random Projection (SRP) dimensionality reduction sweep.
 Runs multiple SRP target dimensions and logs results to CSV.
 """
 

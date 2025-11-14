@@ -1,12 +1,11 @@
 """
-Full experiment: FHE face verification + Autoencoder dimensionality reduction sweep.
+Author: Heitor Pavani Nolla
+All rights reserved
+
+FHE face verification + Autoencoder dimensionality reduction sweep.
 Runs multiple AE target dimensions and logs results to CSV.
 
 This is a non-linear, unsupervised alternative to PCA.
-
-CORRECTED:
-- Trains AE on the 'train' subset (from get_training_data).
-- Encodes and evaluates on the 'test' subset (from get_baseline_embeddings).
 """
 
 import os

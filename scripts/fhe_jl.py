@@ -1,5 +1,8 @@
 """
-Full experiment: FHE face verification + JL-Based Structured Projection (Hadamard) dimensionality reduction sweep.
+Author: Heitor Pavani Nolla
+All rights reserved
+
+FHE face verification + JL-Based Structured Projection (Hadamard) dimensionality reduction sweep.
 Uses Fast Walsh-Hadamard Transform (FWHT) for efficient random projection.
 """
 

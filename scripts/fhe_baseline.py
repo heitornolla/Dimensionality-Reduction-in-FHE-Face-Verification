@@ -1,4 +1,7 @@
 """
+Author: Heitor Pavani Nolla
+All rights reserved
+
 Face verification with FHE.
 """
 

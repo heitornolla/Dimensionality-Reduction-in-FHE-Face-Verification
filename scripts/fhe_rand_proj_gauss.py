@@ -1,4 +1,7 @@
 """
+Author: Heitor Pavani Nolla
+All rights reserved
+
 Full experiment: FHE face verification + Gaussian Random Projection (GRP) dimensionality reduction sweep.
 Runs multiple GRP target dimensions and logs results to CSV.
 """

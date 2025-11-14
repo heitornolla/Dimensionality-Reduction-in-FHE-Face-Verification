@@ -19,7 +19,6 @@ from sklearn.datasets import fetch_lfw_pairs
 from sklearn.metrics import roc_curve, accuracy_score
 from PIL import Image
 
-
 Device = torch.device
 
 def set_deterministic(seed: int = 42):

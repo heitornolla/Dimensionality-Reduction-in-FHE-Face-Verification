@@ -6,7 +6,7 @@ Baseline face verification code.
 """
 
 import os
-import random 
+import random
 from typing import List, Dict
 import time
 
@@ -16,10 +16,11 @@ from torch import Tensor
 import torchvision.transforms as transforms
 from facenet_pytorch import InceptionResnetV1
 from sklearn.datasets import fetch_lfw_pairs
-from sklearn.metrics import accuracy_score, roc_curve, roc_auc_score 
+from sklearn.metrics import accuracy_score, roc_curve, roc_auc_score
 from PIL import Image
 
 Device = torch.device
+
 
 def set_deterministic(seed: int = 42):
     random.seed(seed)
@@ -114,42 +115,43 @@ def find_optimal_threshold(labels: np.ndarray, dists: np.ndarray) -> float:
     opt_threshold_inv = thresholds[opt_idx]
     return -opt_threshold_inv
 
+
 def get_metrics(labels: np.ndarray, dists: np.ndarray) -> Dict[str, float]:
     """
     Calculates Accuracy, AUC, EER, FAR, FRR, and Optimal Threshold.
     """
     # Invert distances (lower distance = higher score)
     scores = -dists
-    
+
     fprs, tprs, thresholds = roc_curve(labels, scores, pos_label=1)
-    
+
     auc = roc_auc_score(labels, scores)
-    
+
     # EER (Equal Error Rate): Point where FAR (FPR) ~= FRR (1-TPR)
     fnrs = 1 - tprs
     eer_idx = np.nanargmin(np.absolute(fnrs - fprs))
     eer = fprs[eer_idx]
-    
+
     # Optimal Threshold (Max TPR - FPR)
     opt_idx = np.argmax(tprs - fprs)
-    optimal_threshold = -thresholds[opt_idx] # Revert to distance scale
-    
+    optimal_threshold = -thresholds[opt_idx]  # Revert to distance scale
+
     # Metrics at Optimal Threshold
     # FAR = FPR at optimal threshold
     # FRR = FNR at optimal threshold
     final_far = fprs[opt_idx]
     final_frr = fnrs[opt_idx]
-    
+
     preds = (dists <= optimal_threshold).astype(int)
     acc = accuracy_score(labels, preds)
-    
+
     return {
         "accuracy": acc * 100,
         "auc": auc,
-        "eer": eer * 100,      
+        "eer": eer * 100,
         "far": final_far * 100,
         "frr": final_frr * 100,
-        "threshold": optimal_threshold
+        "threshold": optimal_threshold,
     }
 
 
@@ -172,7 +174,9 @@ def main():
         flat_images.append(p[0])
         flat_images.append(p[1])
 
-    all_embs = embeddings_for_image_batch(model, device, transform, flat_images, batch_size=64)
+    all_embs = embeddings_for_image_batch(
+        model, device, transform, flat_images, batch_size=64
+    )
     emb1 = all_embs[0::2]
     emb2 = all_embs[1::2]
 
@@ -184,7 +188,6 @@ def main():
     metrics = get_metrics(labels, dists)
     avg_match_time_ms = (total_time / num_pairs) * 1000.0
 
-    print(f"\n--- Baseline Results ---")
     print(f"Avg Match Time: {avg_match_time_ms:.6f} ms")
     print(f"Accuracy:       {metrics['accuracy']:.2f}%")
     print(f"AUC:            {metrics['auc']:.4f}")

@@ -14,13 +14,24 @@ from sklearn.metrics import accuracy_score
 from tqdm import tqdm
 
 from baseline_verification import (
-    get_device, get_model, get_transform,
-    embeddings_for_image_batch, find_optimal_threshold, set_deterministic
+    get_device,
+    get_model,
+    get_transform,
+    embeddings_for_image_batch,
+    find_optimal_threshold,
+    set_deterministic,
 )
 
 
-from openfhe import CCParamsCKKSRNS, CryptoContext, GenCryptoContext, KeyPair, PKESchemeFeature
+from openfhe import (
+    CCParamsCKKSRNS,
+    CryptoContext,
+    GenCryptoContext,
+    KeyPair,
+    PKESchemeFeature,
+)
 from typing import Tuple
+
 
 def setup_fhe_context() -> Tuple[CryptoContext, KeyPair]:
     """
@@ -55,7 +66,7 @@ def fhe_distance(cc: CryptoContext, ct_a, ct_b, sum_slots: int):
     """
     ct_diff = cc.EvalSub(ct_a, ct_b)
     ct_sq = cc.EvalSquare(ct_diff)
-    ct_sum = cc.EvalSum(ct_sq, sum_slots) 
+    ct_sum = cc.EvalSum(ct_sq, sum_slots)
     return ct_sum
 
 
@@ -64,7 +75,7 @@ def get_training_data(model=None, device=None, transform=None) -> np.ndarray:
     Loads the LFW "train" subset and returns all embeddings as a single
     NumPy array for training/fitting unsupervised DR models.
     """
-    
+
     print("Loading LFW 'train' subset for training DR models...")
     if device is None:
         device = get_device()
@@ -75,26 +86,28 @@ def get_training_data(model=None, device=None, transform=None) -> np.ndarray:
 
     lfw_train = fetch_lfw_pairs(subset="train", color=True, resize=1.0)
     pairs = lfw_train.pairs
-    
+
     flat_images = []
     for p in pairs:
         flat_images.append(p[0])
         flat_images.append(p[1])
-        
+
     # We ignore the pairing and labels; we just want the raw data distribution
     all_embs_tensor = embeddings_for_image_batch(
         model, device, transform, flat_images, batch_size=128
     )
-    
+
     print(f"Loaded {len(all_embs_tensor)} training embeddings.")
     return all_embs_tensor.numpy()
 
 
-def get_test_embeddings(model=None, device=None, transform=None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def get_test_embeddings(
+    model=None, device=None, transform=None
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Loads the LFW "test" subset and returns the labels and separated
     embedding pairs as NumPy arrays for evaluation.
-    
+
     Returns:
         labels (np.ndarray): (6000,) array of 0s and 1s
         emb1_np (np.ndarray): (6000, 512) array of "left" embeddings
@@ -109,23 +122,20 @@ def get_test_embeddings(model=None, device=None, transform=None) -> Tuple[np.nda
     if transform is None:
         transform = get_transform(160)
 
-
     lfw_test = fetch_lfw_pairs(subset="test", color=True, resize=1.0)
     pairs = lfw_test.pairs
     labels = lfw_test.target.astype(int)
     num_pairs = len(labels)
-
 
     flat_images = []
     for p in pairs:
         flat_images.append(p[0])
         flat_images.append(p[1])
 
-
     all_embs_tensor = embeddings_for_image_batch(
         model, device, transform, flat_images, batch_size=128
     )
-    
+
     emb1_np = all_embs_tensor[0::2].numpy()
     emb2_np = all_embs_tensor[1::2].numpy()
 
@@ -138,14 +148,14 @@ def main(csv_path):
     Main function to run the FHE baseline (no reduction).
     """
     set_deterministic(42)
-    
+
     device = get_device()
     model = get_model(device)
     transform = get_transform(160)
-    
+
     labels, emb1_np, emb2_np = get_test_embeddings(model, device, transform)
 
-    emb_dim = emb1_np.shape[1] # 512
+    emb_dim = emb1_np.shape[1]  # 512
     print(f"Embedding dimension: {emb_dim}")
 
     print("Setting FHE Context")
@@ -153,8 +163,12 @@ def main(csv_path):
 
     # Pre-encrypt all embeddings (database and probes)
     print("Encrypting embeddings")
-    ct_db = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb1_np)]
-    ct_probe = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb2_np)]
+    ct_db = [
+        cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb1_np)
+    ]
+    ct_probe = [
+        cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb2_np)
+    ]
 
     # We time encrypted matching + decryption
     print("Running encrypted matching")
@@ -179,13 +193,13 @@ def main(csv_path):
 
     print("\n\nFHE Matching Results (No Reduction):")
     print(f"  Average matching time per pair: {avg_time_ms:.3f} ms")
-    print(f"  Accuracy of {acc*100:.2f}%")
+    print(f"  Accuracy of {acc * 100:.2f}%")
     print(f"  Optimal threshold of {opt_thresh:.6f}")
 
     row = [
-        '512',
+        "512",
         f"{avg_time_ms:.3f}",
-        f"{acc*100:.2f}",
+        f"{acc * 100:.2f}",
         f"{opt_thresh:.6f}",
     ]
     with open(csv_path, "a", newline="") as f:

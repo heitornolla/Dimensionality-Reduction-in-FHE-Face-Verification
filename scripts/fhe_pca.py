@@ -14,31 +14,35 @@ import csv
 import time
 import numpy as np
 from sklearn.decomposition import PCA
-from sklearn.metrics import accuracy_score
 from tqdm import tqdm
 
 from baseline_verification import (
-    set_deterministic, find_optimal_threshold, get_device, 
-    get_model, get_transform
+    get_metrics,
+    set_deterministic,
+    get_device,
+    get_model,
+    get_transform,
 )
 
 from fhe_baseline import (
-    get_training_data, get_test_embeddings, 
-    setup_fhe_context, fhe_distance, 
+    get_training_data,
+    get_test_embeddings,
+    setup_fhe_context,
+    fhe_distance,
 )
 
 
 def main(csv_path: str):
     set_deterministic(42)
-    
+
     device = get_device()
     model = get_model(device)
     transform = get_transform(160)
 
     train_data_np = get_training_data(model, device, transform)
-    
+
     orig_dim = train_data_np.shape[1]
-    
+
     print("Fitting PCA on TRAINING data...")
     pca_full = PCA(n_components=orig_dim, random_state=42)
     pca_full.fit(train_data_np)
@@ -48,16 +52,20 @@ def main(csv_path: str):
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     header = [
         "dimension",
-        "explained_variance(%)",
         "avg_time_ms",
         "accuracy(%)",
-        "threshold"
+        "AUC",
+        "EER(%)",
+        "FAR(%)",
+        "FRR(%)",
+        "threshold",
     ]
+
     write_header = not os.path.exists(csv_path)
     if write_header:
         with open(csv_path, "w", newline="") as f:
             csv.writer(f).writerow(header)
-    
+
     print("\nSetting FHE context")
     cc, keys = setup_fhe_context()
 
@@ -67,15 +75,15 @@ def main(csv_path: str):
 
     for target_dim in dims_to_test:
         print(f"\nPCA {orig_dim} → {target_dim}")
-        
+
         # We need to re-fit a new PCA model for this dimension
         print("  Fitting PCA...")
         pca = PCA(n_components=target_dim, random_state=42)
         pca.fit(train_data_np)
-        
+
         emb1_reduced = pca.transform(emb1_np)
         emb2_reduced = pca.transform(emb2_np)
-        
+
         explained_var = np.sum(pca.explained_variance_ratio_) * 100
         print(f"  Explained variance: {explained_var:.2f}%")
 
@@ -83,8 +91,14 @@ def main(csv_path: str):
 
         # Encrypt reduced embeddings
         print("  Encrypting embeddings")
-        ct_db = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb1_reduced)]
-        ct_probe = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb2_reduced)]
+        ct_db = [
+            cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e))
+            for e in tqdm(emb1_reduced)
+        ]
+        ct_probe = [
+            cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e))
+            for e in tqdm(emb2_reduced)
+        ]
 
         # Encrypted matching
         print("  Running encrypted matching")
@@ -99,31 +113,30 @@ def main(csv_path: str):
 
         avg_time_ms = (total_time / len(labels)) * 1000
 
-        opt_thresh = find_optimal_threshold(labels, np.array(distances))
-        preds = (np.array(distances) <= opt_thresh).astype(int)
-        acc = accuracy_score(labels, preds)
+        metrics = get_metrics(labels, np.array(distances))
 
         row = [
             target_dim,
-            f"{explained_var:.2f}",
             f"{avg_time_ms:.3f}",
-            f"{acc*100:.2f}",
-            f"{opt_thresh:.6f}",
+            f"{metrics['accuracy']:.2f}",
+            f"{metrics['auc']:.4f}",
+            f"{metrics['eer']:.2f}",
+            f"{metrics['far']:.2f}",
+            f"{metrics['frr']:.2f}",
+            f"{metrics['threshold']:.6f}",
         ]
+
         with open(csv_path, "a", newline="") as f:
             csv.writer(f).writerow(row)
 
         print(f"  FHE PCA Matching Results for size {target_dim}:")
         print(f"  Average matching time per pair: {avg_time_ms:.3f} ms")
-        print(f"  Accuracy of {acc*100:.2f}%")
-        print(f"  Optimal threshold of {opt_thresh:.6f}")
+        print(f"  Accuracy of {metrics['accuracy']:.2f}%")
         print(f"  Results saved to {csv_path}")
 
 
 if __name__ == "__main__":
-    output_dir = os.path.join(os.path.abspath('.'), "results")
+    output_dir = os.path.join(os.path.abspath("."), "results")
     os.makedirs(output_dir, exist_ok=True)
     output_csv = os.path.join(output_dir, "fhe_pca_results.csv")
-    if os.path.exists(output_csv):
-        os.remove(output_csv)
     main(output_csv)

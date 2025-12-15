@@ -11,15 +11,14 @@ import csv
 import time
 import numpy as np
 from sklearn.random_projection import SparseRandomProjection
-from sklearn.metrics import accuracy_score
 from tqdm import tqdm
 
-from baseline_verification import (
-    set_deterministic, find_optimal_threshold
-)
+from baseline_verification import get_metrics, set_deterministic
 
 from fhe_baseline import (
-    get_test_embeddings, setup_fhe_context, fhe_distance,
+    get_test_embeddings,
+    setup_fhe_context,
+    fhe_distance,
 )
 
 
@@ -35,8 +34,13 @@ def main(csv_path: str):
         "dimension",
         "avg_time_ms",
         "accuracy(%)",
-        "threshold"
+        "AUC",
+        "EER(%)",
+        "FAR(%)",
+        "FRR(%)",
+        "threshold",
     ]
+
     write_header = not os.path.exists(csv_path)
     if write_header:
         with open(csv_path, "w", newline="") as f:
@@ -58,8 +62,14 @@ def main(csv_path: str):
 
         # Encrypt reduced embeddings
         print("  Encrypting embeddings")
-        ct_db = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb1_reduced)]
-        ct_probe = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb2_reduced)]
+        ct_db = [
+            cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e))
+            for e in tqdm(emb1_reduced)
+        ]
+        ct_probe = [
+            cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e))
+            for e in tqdm(emb2_reduced)
+        ]
 
         # Encrypted matching
         print("  Running encrypted matching")
@@ -74,23 +84,25 @@ def main(csv_path: str):
 
         avg_time_ms = (total_time / len(labels)) * 1000
 
-        opt_thresh = find_optimal_threshold(labels, np.array(distances))
-        preds = (np.array(distances) <= opt_thresh).astype(int)
-        acc = accuracy_score(labels, preds)
+        metrics = get_metrics(labels, np.array(distances))
 
         row = [
             target_dim,
             f"{avg_time_ms:.3f}",
-            f"{acc*100:.2f}",
-            f"{opt_thresh:.6f}",
+            f"{metrics['accuracy']:.2f}",
+            f"{metrics['auc']:.4f}",
+            f"{metrics['eer']:.2f}",
+            f"{metrics['far']:.2f}",
+            f"{metrics['frr']:.2f}",
+            f"{metrics['threshold']:.6f}",
         ]
+
         with open(csv_path, "a", newline="") as f:
             csv.writer(f).writerow(row)
 
         print(f"  FHE SRP Matching Results for size {target_dim}:")
         print(f"  Average matching time per pair: {avg_time_ms:.3f} ms")
-        print(f"  Accuracy of {acc*100:.2f}%")
-        print(f"  Optimal threshold of {opt_thresh:.6f}")
+        print(f"  Accuracy of {metrics['accuracy']:.2f}%")
         print(f"  Results saved to {csv_path}")
 
 

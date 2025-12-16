@@ -89,9 +89,6 @@ def main(csv_path: str):
         with open(csv_path, "w", newline="") as f:
             csv.writer(f).writerow(header)
 
-    print("Setting FHE context")
-    cc, keys = setup_fhe_context()
-
     dims_to_test = [512, 256, 128, 64, 32, 16, 8, 4]
     print(f"\nRunning JL-based Hadamard projections for dimensions: {dims_to_test}")
 
@@ -102,10 +99,11 @@ def main(csv_path: str):
 
         emb_dim = emb1_reduced.shape[1]
 
-        # Encrypt reduced embeddings
-        print("  Encrypting embeddings")
+        cc, keys = setup_fhe_context(target_dim)
+        
+        print("  Encrypting")
         ct_db = [
-            cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e))
+            cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) 
             for e in tqdm(emb1_reduced)
         ]
         ct_probe = [

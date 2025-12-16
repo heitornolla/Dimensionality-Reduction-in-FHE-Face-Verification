@@ -10,7 +10,7 @@ from fhe_rsvd import main as rsvd_reduction
 
 if __name__ == "__main__":
     baseline()
-    fhe_baseline(csv_path="results/baseline")
+    fhe_baseline(csv_path="results/baseline.csv")
 
     for i in range(10):
         print(f"--- RUN {i + 1} ---\n")

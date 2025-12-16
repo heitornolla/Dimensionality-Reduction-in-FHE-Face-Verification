@@ -29,23 +29,28 @@ from openfhe import (
     GenCryptoContext,
     KeyPair,
     PKESchemeFeature,
+    SecurityLevel
 )
 from typing import Tuple
 
 
-def setup_fhe_context() -> Tuple[CryptoContext, KeyPair]:
+def setup_fhe_context(target_dim: int = 512) -> Tuple[CryptoContext, KeyPair]:
     """
-    CKKS setup.
-    Returns (cc, keys).
+    CKKS setup optimized for a specific vector dimension.
     """
-    fhe_batch_size = 16384  # 128-bit security
-    mult_depth = 5
+
+    fhe_batch_size = max(8, target_dim) 
+
+    mult_depth = 2 
     scale_mod_size = 50
 
     params = CCParamsCKKSRNS()
     params.SetMultiplicativeDepth(mult_depth)
     params.SetScalingModSize(scale_mod_size)
     params.SetBatchSize(fhe_batch_size)
+    
+    # Explicitly request 128-bit security to ensure fair comparison
+    params.SetSecurityLevel(SecurityLevel.HEStd_128_classic)
 
     cc = GenCryptoContext(params)
     cc.Enable(PKESchemeFeature.PKE)
@@ -55,7 +60,14 @@ def setup_fhe_context() -> Tuple[CryptoContext, KeyPair]:
 
     keys = cc.KeyGen()
     cc.EvalMultKeyGen(keys.secretKey)
-    cc.EvalSumKeyGen(keys.secretKey)
+    
+    if target_dim > 1:
+        rotations = []
+        cur = 1
+        while cur < target_dim:
+            rotations.append(cur)
+            cur *= 2
+        cc.EvalRotateKeyGen(keys.secretKey, rotations)
 
     return cc, keys
 

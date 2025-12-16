@@ -55,30 +55,31 @@ def main(csv_path: str):
         with open(csv_path, "w", newline="") as f:
             csv.writer(f).writerow(header)
 
-    print("Setting FHE context")
-    cc, keys = setup_fhe_context()
-
-    # Test multiple PCA dimensions
+     # Test multiple PCA dimensions
     dims_to_test = [512, 256, 128, 64, 32, 16, 8, 4]
     print(f"\nRunning for dimensions: {dims_to_test}")
 
     for target_dim in dims_to_test:
         print(f"RSVD {orig_dim} to {target_dim}")
+
         pca = PCA(n_components=target_dim, svd_solver="randomized", random_state=42)
         pca.fit(all_embs_np)
 
         emb1_reduced = pca.transform(emb1)
         emb2_reduced = pca.transform(emb2)
 
+        cc, keys = setup_fhe_context(target_dim)
+
         explained_var = np.sum(pca.explained_variance_ratio_) * 100
         print(f"  Explained variance: {explained_var:.2f}%")
 
         emb_dim = emb1_reduced.shape[1]
 
-        # Encrypt reduced embeddings
-        print("  Encrypting embeddings")
+        cc, keys = setup_fhe_context(target_dim)
+        
+        print("  Encrypting")
         ct_db = [
-            cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e))
+            cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) 
             for e in tqdm(emb1_reduced)
         ]
         ct_probe = [

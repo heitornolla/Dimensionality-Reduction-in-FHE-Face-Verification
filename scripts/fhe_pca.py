@@ -41,12 +41,8 @@ def main(csv_path: str):
 
     train_data_np = get_training_data(model, device, transform)
 
-    orig_dim = train_data_np.shape[1]
-
     print("Fitting PCA on TRAINING data...")
-    pca_full = PCA(n_components=orig_dim, random_state=42)
-    pca_full.fit(train_data_np)
-
+    
     labels, emb1_np, emb2_np = get_test_embeddings(model, device, transform)
 
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
@@ -66,39 +62,30 @@ def main(csv_path: str):
         with open(csv_path, "w", newline="") as f:
             csv.writer(f).writerow(header)
 
-    print("\nSetting FHE context")
-    cc, keys = setup_fhe_context()
-
     # Test multiple PCA dimensions
     dims_to_test = [512, 256, 128, 64, 32, 16, 8, 4]
-    print(f"\nRunning PCA for dimensions: {dims_to_test}")
 
     for target_dim in dims_to_test:
-        print(f"\nPCA {orig_dim} → {target_dim}")
-
-        # We need to re-fit a new PCA model for this dimension
-        print("  Fitting PCA...")
+        print(f"\n--- Testing Dimension: {target_dim} ---")
+        
         pca = PCA(n_components=target_dim, random_state=42)
-        pca.fit(train_data_np)
-
+        train_reduced = pca.fit_transform(train_data_np)
         emb1_reduced = pca.transform(emb1_np)
         emb2_reduced = pca.transform(emb2_np)
 
-        explained_var = np.sum(pca.explained_variance_ratio_) * 100
-        print(f"  Explained variance: {explained_var:.2f}%")
-
-        emb_dim = emb1_reduced.shape[1]
-
-        # Encrypt reduced embeddings
-        print("  Encrypting embeddings")
+        cc, keys = setup_fhe_context(target_dim)
+        
+        print("  Encrypting...")
         ct_db = [
-            cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e))
+            cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) 
             for e in tqdm(emb1_reduced)
         ]
         ct_probe = [
             cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e))
             for e in tqdm(emb2_reduced)
         ]
+
+        emb_dim = emb1_reduced.shape[1]
 
         # Encrypted matching
         print("  Running encrypted matching")

@@ -85,7 +85,7 @@ def get_training_data(model=None, device=None, transform=None) -> np.ndarray:
     NumPy array for training/fitting unsupervised DR models.
     """
 
-    print("Loading LFW 'train' subset for training DR models...")
+    print("Loading LFW 'train' subset for training DR models")
     if device is None:
         device = get_device()
     if model is None:

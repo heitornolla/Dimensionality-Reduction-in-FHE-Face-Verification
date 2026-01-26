@@ -17,6 +17,7 @@ from sklearn.decomposition import PCA
 from tqdm import tqdm
 
 from baseline_verification import (
+    cross_validate_lfw,
     get_metrics,
     set_deterministic,
     get_device,
@@ -25,23 +26,20 @@ from baseline_verification import (
 )
 
 from fhe_baseline import (
-    get_training_data,
     get_test_embeddings,
     setup_fhe_context,
     fhe_distance,
 )
 
 
-def main(csv_path: str):
-    set_deterministic(42)
+def main(csv_path: str, seed=42):
+    set_deterministic(seed)
 
     device = get_device()
     model = get_model(device)
     transform = get_transform(160)
 
-    train_data_np = get_training_data(model, device, transform)
-
-    print("Fitting PCA on TRAINING data...")
+    print("Fitting PCA")
     
     labels, emb1_np, emb2_np = get_test_embeddings(model, device, transform)
 
@@ -49,11 +47,9 @@ def main(csv_path: str):
     header = [
         "dimension",
         "avg_time_ms",
-        "accuracy(%)",
+        "mean_accuracy(%)",
+        "std_dev(%)",
         "AUC",
-        "EER(%)",
-        "FAR(%)",
-        "FRR(%)",
         "threshold",
     ]
 
@@ -65,17 +61,16 @@ def main(csv_path: str):
     # Test multiple PCA dimensions
     dims_to_test = [512, 256, 128, 64, 32, 16, 8, 4]
 
+    print(f"\nRunning for dimensions: {dims_to_test}")
     for target_dim in dims_to_test:
-        print(f"\n--- Testing Dimension: {target_dim} ---")
+        print(f"\nPCA to {target_dim}")
         
         pca = PCA(n_components=target_dim, random_state=42)
-        train_reduced = pca.fit_transform(train_data_np)
         emb1_reduced = pca.transform(emb1_np)
         emb2_reduced = pca.transform(emb2_np)
 
         cc, keys = setup_fhe_context(target_dim)
         
-        print("  Encrypting...")
         ct_db = [
             cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) 
             for e in tqdm(emb1_reduced)
@@ -88,7 +83,6 @@ def main(csv_path: str):
         emb_dim = emb1_reduced.shape[1]
 
         # Encrypted matching
-        print("  Running encrypted matching")
         distances = []
         total_time = 0.0
         for i in tqdm(range(len(labels)), leave=False):
@@ -102,23 +96,25 @@ def main(csv_path: str):
 
         metrics = get_metrics(labels, np.array(distances))
 
+        accuracies = cross_validate_lfw(labels, np.array(distances), n_folds=10)
+        mean_acc = np.mean(accuracies) * 100
+        std_acc = np.std(accuracies) * 100
+        
+        # Additional global metrics for reference
+        metrics = get_metrics(labels, np.array(distances))
+
         row = [
             target_dim,
             f"{avg_time_ms:.3f}",
-            f"{metrics['accuracy']:.2f}",
+            f"{mean_acc:.2f}",
+            f"{std_acc:.2f}",
             f"{metrics['auc']:.4f}",
-            f"{metrics['eer']:.2f}",
-            f"{metrics['far']:.2f}",
-            f"{metrics['frr']:.2f}",
             f"{metrics['threshold']:.6f}",
         ]
 
         with open(csv_path, "a", newline="") as f:
             csv.writer(f).writerow(row)
 
-        print(f"  FHE PCA Matching Results for size {target_dim}:")
-        print(f"  Average matching time per pair: {avg_time_ms:.3f} ms")
-        print(f"  Accuracy of {metrics['accuracy']:.2f}%")
         print(f"  Results saved to {csv_path}")
 
 

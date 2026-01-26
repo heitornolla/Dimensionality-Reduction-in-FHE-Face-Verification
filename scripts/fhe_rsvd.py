@@ -1,21 +1,23 @@
 """
 Author: Heitor Pavani Nolla
 All rights reserved
-
-FHE face verification + Randomized SVD dimensionality reduction sweep.
-Runs multiple PCA target dimensions and logs results to CSV.
+FHE face verification + RSVD dimensionality reduction sweep.
 """
 
 import os
 import csv
 import time
 import numpy as np
-from sklearn.decomposition import PCA
+from sklearn.utils.extmath import randomized_svd
 from tqdm import tqdm
 
 from baseline_verification import (
+    cross_validate_lfw,
     get_metrics,
     set_deterministic,
+    get_device,
+    get_model,
+    get_transform,
 )
 
 from fhe_baseline import (
@@ -24,71 +26,45 @@ from fhe_baseline import (
     fhe_distance,
 )
 
+def main(csv_path: str, seed=42):
+    set_deterministic(seed)
+    device = get_device()
+    model = get_model(device)
+    transform = get_transform(160)
 
-def main(csv_path: str):
-    set_deterministic(42)
-    labels, emb1, emb2 = get_test_embeddings()
-
-    orig_dim = emb1.shape[1]
-
-    # Fit PCA once on full embedding space
-    print("Fitting RSVD")
-    all_embs_np = np.vstack((emb1, emb2))
-
-    pca_full = PCA(n_components=orig_dim, random_state=42)
-    pca_full.fit(all_embs_np)
+    labels, emb1_np, emb2_np = get_test_embeddings(model, device, transform)
 
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+    
     header = [
-        "dimension",
-        "avg_time_ms",
-        "accuracy(%)",
-        "AUC",
-        "EER(%)",
-        "FAR(%)",
-        "FRR(%)",
-        "threshold",
+        "dimension", 
+        "avg_time_ms", 
+        "mean_accuracy(%)", 
+        "std_dev(%)", 
+        "AUC", 
+        "threshold"
     ]
-
+    
     write_header = not os.path.exists(csv_path)
     if write_header:
         with open(csv_path, "w", newline="") as f:
             csv.writer(f).writerow(header)
 
-     # Test multiple PCA dimensions
-    dims_to_test = [512, 256, 128, 64, 32, 16, 8, 4]
-    print(f"\nRunning for dimensions: {dims_to_test}")
+    target_dims = [512, 256, 128, 64, 32, 16, 8, 4]
 
-    for target_dim in dims_to_test:
-        print(f"RSVD {orig_dim} to {target_dim}")
-
-        pca = PCA(n_components=target_dim, svd_solver="randomized", random_state=42)
-        pca.fit(all_embs_np)
-
-        emb1_reduced = pca.transform(emb1)
-        emb2_reduced = pca.transform(emb2)
-
-        cc, keys = setup_fhe_context(target_dim)
-
-        explained_var = np.sum(pca.explained_variance_ratio_) * 100
-        print(f"  Explained variance: {explained_var:.2f}%")
+    for target_dim in target_dims:
+        print(f"\nEvaluating RSVD dimension: {target_dim}")
+        
+        U, S, Vt = randomized_svd(emb1_np, n_components=target_dim, random_state=42)
+        emb1_reduced = emb1_np @ Vt.T
+        emb2_reduced = emb2_np @ Vt.T
 
         emb_dim = emb1_reduced.shape[1]
+        cc, keys = setup_fhe_context(target_dim=emb_dim)
 
-        cc, keys = setup_fhe_context(target_dim)
-        
-        print("  Encrypting")
-        ct_db = [
-            cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) 
-            for e in tqdm(emb1_reduced)
-        ]
-        ct_probe = [
-            cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e))
-            for e in tqdm(emb2_reduced)
-        ]
+        ct_db = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in emb1_reduced]
+        ct_probe = [cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in emb2_reduced]
 
-        # Encrypted matching
-        print("  Running encrypted matching")
         distances = []
         total_time = 0.0
         for i in tqdm(range(len(labels)), leave=False):
@@ -98,30 +74,26 @@ def main(csv_path: str):
             total_time += time.perf_counter() - t0
             distances.append(float(pt_res.GetRealPackedValue()[0]))
 
+        accuracies = cross_validate_lfw(labels, np.array(distances), n_folds=10)
+        mean_acc = np.mean(accuracies) * 100
+        std_acc = np.std(accuracies) * 100
+        
         avg_time_ms = (total_time / len(labels)) * 1000
-
         metrics = get_metrics(labels, np.array(distances))
 
         row = [
             target_dim,
             f"{avg_time_ms:.3f}",
-            f"{metrics['accuracy']:.2f}",
+            f"{mean_acc:.2f}",
+            f"{std_acc:.2f}",
             f"{metrics['auc']:.4f}",
-            f"{metrics['eer']:.2f}",
-            f"{metrics['far']:.2f}",
-            f"{metrics['frr']:.2f}",
             f"{metrics['threshold']:.6f}",
         ]
 
         with open(csv_path, "a", newline="") as f:
             csv.writer(f).writerow(row)
 
-        print(f"  FHE RSVD Matching Results for size {target_dim}:")
-        print(f"  Average matching time per pair: {avg_time_ms:.3f} ms")
-        print(f"  Accuracy of {metrics['accuracy']:.2f}%")
         print(f"  Results saved to {csv_path}")
 
-
 if __name__ == "__main__":
-    output_csv = f"{os.path.abspath('./')}/results/fhe_rsvd_results.csv"
-    main(output_csv)
+    main("results/fhe_rsvd.csv")

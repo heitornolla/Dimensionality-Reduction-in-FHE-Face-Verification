@@ -65,12 +65,11 @@ def hadamard_projection(
     return X_proj.astype(np.float32)
 
 
-def main(csv_path: str):
-    set_deterministic(42)
+def main(csv_path: str, seed=42):
+    set_deterministic(seed)
     labels, emb1, emb2 = get_test_embeddings()
 
     orig_dim = emb1.shape[1]
-    print(f"Original embedding dimension: {orig_dim}")
 
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     header = [
@@ -101,7 +100,6 @@ def main(csv_path: str):
 
         cc, keys = setup_fhe_context(target_dim)
         
-        print("  Encrypting")
         ct_db = [
             cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) 
             for e in tqdm(emb1_reduced)
@@ -112,7 +110,6 @@ def main(csv_path: str):
         ]
 
         # Encrypted matching
-        print("  Running encrypted matching")
         distances = []
         total_time = 0.0
         for i in tqdm(range(len(labels)), leave=False):
@@ -140,9 +137,6 @@ def main(csv_path: str):
         with open(csv_path, "a", newline="") as f:
             csv.writer(f).writerow(row)
 
-        print(f"  FHE JL Matching Results for size {target_dim}:")
-        print(f"  Average matching time per pair: {avg_time_ms:.3f} ms")
-        print(f"  Accuracy of {metrics['accuracy']:.2f}%")
         print(f"  Results saved to {csv_path}")
 
 

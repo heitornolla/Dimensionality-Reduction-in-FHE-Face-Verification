@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     for i in range(10):
         print(f"--- RUN {i + 1} ---\n")
-        seed = int(time.time_ns())
+        seed = int(time.time_ns() % (2**32 - 1))
         print(f"Seed {seed}")
 
         print("\nRunning JL\n")

@@ -18,6 +18,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
 from baseline_verification import (
+    cross_validate_lfw,
     get_metrics,
     set_deterministic,
     get_device,
@@ -92,7 +93,7 @@ def train_autoencoder(
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     model.train()
-    print(f"  Training AE for {epochs} epochs...")
+    print(f"  Training AE for {epochs} epochs")
     for _ in range(epochs):
         for batch in loader:
             inputs = batch[0].to(device)
@@ -107,8 +108,8 @@ def train_autoencoder(
     return model.encoder.eval()
 
 
-def main(csv_path: str):
-    set_deterministic(42)
+def main(csv_path: str, seed=42):
+    set_deterministic(seed)
     device = get_device()
 
     model = get_model(device)
@@ -125,15 +126,12 @@ def main(csv_path: str):
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
 
     header = [
-        "dimension",
-        "avg_time_ms",
-        "accuracy(%)",
-        "AUC",
-        "EER(%)",
-        "FAR(%)",
-        "FRR(%)",
-        "threshold",
-    ]
+    "dimension",
+    "avg_time_ms",
+    "mean_accuracy(%)",
+    "std_dev(%)",
+    "AUC",
+    ]   
 
     write_header = not os.path.exists(csv_path)
     if write_header:
@@ -159,7 +157,6 @@ def main(csv_path: str):
 
         cc, keys = setup_fhe_context(target_dim)
         
-        print("  Encrypting")
         ct_db = [
             cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) 
             for e in tqdm(emb1_reduced)
@@ -169,7 +166,6 @@ def main(csv_path: str):
             for e in tqdm(emb2_reduced)
         ]
 
-        print("  Running encrypted matching")
         distances = []
         total_time = 0.0
         for i in tqdm(range(len(labels)), leave=False):
@@ -181,25 +177,21 @@ def main(csv_path: str):
 
         avg_time_ms = (total_time / len(labels)) * 1000
 
-        metrics = get_metrics(labels, np.array(distances))
+        accuracies = cross_validate_lfw(labels, np.array(distances), n_folds=10)
+        mean_acc = np.mean(accuracies) * 100
+        std_acc = np.std(accuracies) * 100
 
         row = [
             target_dim,
             f"{avg_time_ms:.3f}",
-            f"{metrics['accuracy']:.2f}",
-            f"{metrics['auc']:.4f}",
-            f"{metrics['eer']:.2f}",
-            f"{metrics['far']:.2f}",
-            f"{metrics['frr']:.2f}",
-            f"{metrics['threshold']:.6f}",
+            f"{mean_acc:.2f}",
+            f"{std_acc:.2f}",
+            f"{get_metrics(labels, np.array(distances))['auc']:.4f}",
         ]
 
         with open(csv_path, "a", newline="") as f:
             csv.writer(f).writerow(row)
 
-        print(f"  FHE AE Matching Results for size {target_dim}:")
-        print(f"  Average matching time per pair: {avg_time_ms:.3f} ms")
-        print(f"  Accuracy of {metrics['accuracy']:.2f}%")
         print(f"  Results saved to {csv_path}")
 
 

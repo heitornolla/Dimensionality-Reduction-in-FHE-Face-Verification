@@ -127,8 +127,8 @@ def get_metrics(labels: np.ndarray, dists: np.ndarray) -> Dict[str, float]:
         "threshold": optimal_threshold,
     }
 
-def main():
-    set_deterministic(42)
+def main(seed=42):
+    set_deterministic(seed)
     device = get_device()
     print(f"Running on device: {device}")
     model = get_model(device)
@@ -156,13 +156,13 @@ def main():
     std_acc = np.std(accuracies) * 100
     avg_match_time_ms = (total_time / num_pairs) * 1000.0
 
-    print(f"\nResults:")
+    print("\nResults:")
     print(f"Mean Accuracy:    {mean_acc:.2f}%")
     print(f"Std Deviation:    {std_acc:.2f}%")
     print(f"Avg Match Time:   {avg_match_time_ms:.6f} ms")
 
     metrics = get_metrics(labels, dists)
-    print(f"\nGlobal Metrics (Aggregated)")
+    print("\nGlobal Metrics (Aggregated)")
     print(f"AUC:              {metrics['auc']:.4f}")
     print(f"EER:              {metrics['eer']:.2f}%")
     print(f"Global Threshold: {metrics['threshold']:.6f}")

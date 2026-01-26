@@ -5,20 +5,17 @@ All rights reserved
 Face verification with FHE.
 """
 
-import csv
-import os
 import time
 import numpy as np
 from sklearn.datasets import fetch_lfw_pairs
-from sklearn.metrics import accuracy_score
 from tqdm import tqdm
 
 from baseline_verification import (
+    cross_validate_lfw,
     get_device,
     get_model,
     get_transform,
     embeddings_for_image_batch,
-    find_optimal_threshold,
     set_deterministic,
 )
 
@@ -126,7 +123,6 @@ def get_test_embeddings(
         emb2_np (np.ndarray): (6000, 512) array of "right" embeddings
     """
 
-    print("Loading LFW test subset for evaluation...")
     if device is None:
         device = get_device()
     if model is None:
@@ -155,26 +151,17 @@ def get_test_embeddings(
     return labels, emb1_np, emb2_np
 
 
-def main(csv_path):
-    """
-    Main function to run the FHE baseline (no reduction).
-    """
-    set_deterministic(42)
-
+def main(csv_path: str = "results/fhe_baseline.csv", seed=42):
+    set_deterministic(seed)
     device = get_device()
     model = get_model(device)
     transform = get_transform(160)
 
     labels, emb1_np, emb2_np = get_test_embeddings(model, device, transform)
 
-    emb_dim = emb1_np.shape[1]  # 512
-    print(f"Embedding dimension: {emb_dim}")
-
-    print("Setting FHE Context")
     cc, keys = setup_fhe_context()
 
     # Pre-encrypt all embeddings (database and probes)
-    print("Encrypting embeddings")
     ct_db = [
         cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb1_np)
     ]
@@ -182,44 +169,24 @@ def main(csv_path):
         cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb2_np)
     ]
 
-    # We time encrypted matching + decryption
-    print("Running encrypted matching")
     distances = []
     total_time = 0.0
-
     for i in tqdm(range(len(labels))):
         t0 = time.perf_counter()
-        ct_res = fhe_distance(cc, ct_db[i], ct_probe[i], sum_slots=emb_dim)
+        ct_res = fhe_distance(cc, ct_db[i], ct_probe[i], sum_slots=512)
         pt_res = cc.Decrypt(keys.secretKey, ct_res)
         total_time += time.perf_counter() - t0
+        distances.append(float(pt_res.GetRealPackedValue()[0]))
 
-        val = float(pt_res.GetRealPackedValue()[0])
-        distances.append(val)
-
+    accuracies = cross_validate_lfw(labels, np.array(distances), n_folds=10)
+    
+    mean_acc = np.mean(accuracies) * 100
+    std_acc = np.std(accuracies) * 100
     avg_time_ms = (total_time / len(labels)) * 1000
 
-    # Same accuracy evaluation as baseline
-    opt_thresh = find_optimal_threshold(labels, np.array(distances))
-    preds = (np.array(distances) <= opt_thresh).astype(int)
-    acc = accuracy_score(labels, np.array(preds))
-
-    print("\n\nFHE Matching Results (No Reduction):")
-    print(f"  Average matching time per pair: {avg_time_ms:.3f} ms")
-    print(f"  Accuracy of {acc * 100:.2f}%")
-    print(f"  Optimal threshold of {opt_thresh:.6f}")
-
-    row = [
-        "512",
-        f"{avg_time_ms:.3f}",
-        f"{acc * 100:.2f}",
-        f"{opt_thresh:.6f}",
-    ]
-    with open(csv_path, "a", newline="") as f:
-        csv.writer(f).writerow(row)
-
-    print(f"  Results saved to {csv_path}")
-
+    print("\nFHE Baseline Results:")
+    print(f"  Avg matching time: {avg_time_ms:.3f} ms")
+    print(f"  Accuracy of {mean_acc:.2f}% (+/- {std_acc:.2f}%)")
 
 if __name__ == "__main__":
-    output_csv = f"{os.path.abspath('./')}/results/fhe_base_results.csv"
-    main(output_csv)
+    main()

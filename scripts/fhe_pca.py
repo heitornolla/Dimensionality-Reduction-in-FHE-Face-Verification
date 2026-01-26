@@ -27,6 +27,7 @@ from baseline_verification import (
 
 from fhe_baseline import (
     get_test_embeddings,
+    get_training_data,
     setup_fhe_context,
     fhe_distance,
 )
@@ -38,6 +39,8 @@ def main(csv_path: str, seed=42):
     device = get_device()
     model = get_model(device)
     transform = get_transform(160)
+
+    train_data_np = get_training_data(model, device, transform)
 
     print("Fitting PCA")
     
@@ -64,6 +67,7 @@ def main(csv_path: str, seed=42):
     print(f"\nRunning for dimensions: {dims_to_test}")
     for target_dim in dims_to_test:
         print(f"\nPCA to {target_dim}")
+        train_reduced = pca.fit_transform(train_data_np)
         
         pca = PCA(n_components=target_dim, random_state=42)
         emb1_reduced = pca.transform(emb1_np)

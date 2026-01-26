@@ -14,7 +14,6 @@ import csv
 import time
 import numpy as np
 from sklearn.decomposition import PCA
-from tqdm import tqdm
 
 from baseline_verification import (
     cross_validate_lfw,
@@ -67,9 +66,10 @@ def main(csv_path: str, seed=42):
     print(f"\nRunning for dimensions: {dims_to_test}")
     for target_dim in dims_to_test:
         print(f"\nPCA to {target_dim}")
+        
+        pca = PCA(n_components=target_dim, random_state=seed)
         train_reduced = pca.fit_transform(train_data_np)
         
-        pca = PCA(n_components=target_dim, random_state=42)
         emb1_reduced = pca.transform(emb1_np)
         emb2_reduced = pca.transform(emb2_np)
 
@@ -77,11 +77,11 @@ def main(csv_path: str, seed=42):
         
         ct_db = [
             cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) 
-            for e in tqdm(emb1_reduced)
+            for e in emb1_reduced
         ]
         ct_probe = [
             cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e))
-            for e in tqdm(emb2_reduced)
+            for e in emb2_reduced
         ]
 
         emb_dim = emb1_reduced.shape[1]
@@ -89,7 +89,7 @@ def main(csv_path: str, seed=42):
         # Encrypted matching
         distances = []
         total_time = 0.0
-        for i in tqdm(range(len(labels)), leave=False):
+        for i in range(len(labels)):
             t0 = time.perf_counter()
             ct_res = fhe_distance(cc, ct_db[i], ct_probe[i], sum_slots=emb_dim)
             pt_res = cc.Decrypt(keys.secretKey, ct_res)

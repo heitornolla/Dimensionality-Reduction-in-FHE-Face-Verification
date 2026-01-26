@@ -9,7 +9,6 @@ import csv
 import time
 import numpy as np
 from sklearn.utils.extmath import randomized_svd
-from tqdm import tqdm
 
 from baseline_verification import (
     cross_validate_lfw,
@@ -67,7 +66,7 @@ def main(csv_path: str, seed=42):
 
         distances = []
         total_time = 0.0
-        for i in tqdm(range(len(labels)), leave=False):
+        for i in range(len(labels)):
             t0 = time.perf_counter()
             ct_res = fhe_distance(cc, ct_db[i], ct_probe[i], sum_slots=emb_dim)
             pt_res = cc.Decrypt(keys.secretKey, ct_res)

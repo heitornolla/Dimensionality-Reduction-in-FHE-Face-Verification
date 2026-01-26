@@ -8,7 +8,6 @@ Face verification with FHE.
 import time
 import numpy as np
 from sklearn.datasets import fetch_lfw_pairs
-from tqdm import tqdm
 
 from baseline_verification import (
     cross_validate_lfw,
@@ -85,7 +84,7 @@ def get_training_data(model=None, device=None, transform=None) -> np.ndarray:
     NumPy array for training/fitting unsupervised DR models.
     """
 
-    print("Loading LFW 'train' subset for training DR models")
+    print("Loading LFW train subset")
     if device is None:
         device = get_device()
     if model is None:
@@ -163,15 +162,15 @@ def main(csv_path: str = "results/fhe_baseline.csv", seed=42):
 
     # Pre-encrypt all embeddings (database and probes)
     ct_db = [
-        cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb1_np)
+        cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in emb1_np
     ]
     ct_probe = [
-        cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in tqdm(emb2_np)
+        cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) for e in emb2_np
     ]
 
     distances = []
     total_time = 0.0
-    for i in tqdm(range(len(labels))):
+    for i in range(len(labels)):
         t0 = time.perf_counter()
         ct_res = fhe_distance(cc, ct_db[i], ct_probe[i], sum_slots=512)
         pt_res = cc.Decrypt(keys.secretKey, ct_res)

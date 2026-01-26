@@ -15,7 +15,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-from tqdm import tqdm
 
 from baseline_verification import (
     cross_validate_lfw,
@@ -159,16 +158,16 @@ def main(csv_path: str, seed=42):
         
         ct_db = [
             cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e)) 
-            for e in tqdm(emb1_reduced)
+            for e in emb1_reduced
         ]
         ct_probe = [
             cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(e))
-            for e in tqdm(emb2_reduced)
+            for e in emb2_reduced
         ]
 
         distances = []
         total_time = 0.0
-        for i in tqdm(range(len(labels)), leave=False):
+        for i in range(len(labels)):
             t0 = time.perf_counter()
             ct_res = fhe_distance(cc, ct_db[i], ct_probe[i], sum_slots=emb_dim)
             pt_res = cc.Decrypt(keys.secretKey, ct_res)

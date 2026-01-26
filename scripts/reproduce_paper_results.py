@@ -1,3 +1,5 @@
+import time
+
 from baseline_verification import main as baseline
 from fhe_baseline import main as fhe_baseline
 from fhe_jl import main as jl_reduction
@@ -14,15 +16,18 @@ if __name__ == "__main__":
 
     for i in range(10):
         print(f"--- RUN {i + 1} ---\n")
+        seed = int(time.time_ns())
+        print(f"Seed {seed}")
+
         print("\nRunning JL\n")
-        jl_reduction(csv_path="results/jl_results.csv")
+        jl_reduction(csv_path="results/jl_results.csv", seed=seed)
         print("\nRunning AE\n")
-        ae_reduction(csv_path="results/ae_results.csv")
+        ae_reduction(csv_path="results/ae_results.csv", seed=seed)
         print("\nRunning PCA\n")
-        pca_reduction(csv_path="results/pca_results.csv")
+        pca_reduction(csv_path="results/pca_results.csv", seed=seed)
         print("\nRunning GRP\n")
-        grp_reduction(csv_path="results/grp_results.csv")
+        grp_reduction(csv_path="results/grp_results.csv", seed=seed)
         print("\nRunning SRP\n")
-        srp_reduction(csv_path="results/srp_results.csv")
+        srp_reduction(csv_path="results/srp_results.csv", seed=seed)
         print("\nRunning RSVD\n")
-        rsvd_reduction(csv_path="results/rsvd_results.csv")
+        rsvd_reduction(csv_path="results/rsvd_results.csv", seed=seed)

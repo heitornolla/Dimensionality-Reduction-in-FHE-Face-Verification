@@ -62,4 +62,4 @@ python scripts/reproduce_paper_results.py
 
 ## Contact Information
 
-For questions about this work, feel free to contact Heitor Nolla at [LinkedIn](https://www.linkedin.com/in/heitor-nolla/) ou [email](mailto:h173233@dac.unicamp.br) at h173233 *at* gmail *dot* com
+For questions about this work, feel free to contact Heitor Nolla at [LinkedIn](https://www.linkedin.com/in/heitor-nolla/) or email: h173233@dac.unicamp.br

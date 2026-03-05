@@ -2,7 +2,7 @@
 
 This repository contains codes for the paper:
 
-**“Comparison of Unsupervised Dimensionality Reduction Methods for Fully Homomorphic Encrypted Facial Verification”**, submitted to IWBF 2026.
+**“Comparison of Unsupervised Dimensionality Reduction Methods for Fully Homomorphic Encrypted Facial Verification”**, accepted at IWBF 2026.
 
 The goal of this project is to systematically evaluate how unsupervised dimensionality reduction techniques impact **accuracy** and **computational efficiency** in a **Fully Homomorphic Encryption (FHE)**-based face verification pipeline.
 

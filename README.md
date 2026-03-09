@@ -43,7 +43,7 @@ python scripts/reproduce_paper_results.py
 
 If you choose to not use Docker, you can just create a virtual environment and download the required packages from the `requirements.txt` file. From there, merely run the scripts in the `/scripts` folder. You may run our exact pipeline by running `reproduce_paper_results.py`, but beware that the experiments may take a long time to finish.
 
-We recommend `Python >3.12` for these codes. Specifically, we used version `3.12.7` and Miniconda[https://www.anaconda.com/docs/getting-started/miniconda/main] as a package manager  
+We recommend `Python >3.12` for these codes. Specifically, we used version `3.12.7` and [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main) as a package manager  
 
 
 ## Contact Information

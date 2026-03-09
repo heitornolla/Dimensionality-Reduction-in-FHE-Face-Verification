@@ -49,8 +49,3 @@ We recommend `Python >3.12` for these codes. Specifically, we used version `3.12
 ## Contact Information
 
 For questions about this work, feel free to contact Heitor Nolla at [LinkedIn](https://www.linkedin.com/in/heitor-nolla/) or email: h173233@dac.unicamp.br
-
-
-## Contact Information
-
-For questions about this work, feel free to contact Heitor Nolla at [LinkedIn](https://www.linkedin.com/in/heitor-nolla/) or email: h173233@dac.unicamp.br

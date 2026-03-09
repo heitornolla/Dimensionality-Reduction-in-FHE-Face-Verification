@@ -4,36 +4,13 @@ This repository contains codes for the paper:
 
 **“Comparison of Unsupervised Dimensionality Reduction Methods for Fully Homomorphic Encrypted Facial Verification”**, accepted at IWBF 2026.
 
-The goal of this project is to systematically evaluate how unsupervised dimensionality reduction techniques impact **accuracy** and **computational efficiency** in a **Fully Homomorphic Encryption (FHE)**-based face verification pipeline.
+We systematically evaluate how unsupervised dimensionality reduction techniques impact **accuracy** and **computational efficiency** in a **Fully Homomorphic Encryption (FHE)**-based face verification pipeline.
 
 ---
 
 ## Overview
 
-FHE enables biometric matching directly on encrypted data, providing end-to-end template protection. However, FHE introduces substantial computational overhead.
-
-This repository explores **dimensionality reduction as a practical, encryption-agnostic optimization**, showing that compressing face embeddings _before encryption_ can significantly reduce homomorphic computation time while preserving verification accuracy.
-
-### Key Findings
-
-- Reducing FaceNet embeddings from **512-D to 32-D** yields:
-  - ~**1.5× speedup** in homomorphic matching
-  - **No measurable loss in accuracy or EER** (with data-driven methods)
-- Data-driven methods (PCA, RSVD, Autoencoders) are more robust at aggressive compression
-- Training-free methods (Random Projections, JL-Hadamard) perform competitively at moderate dimensions
-
----
-
-## Evaluated Techniques
-
-The following **unsupervised dimensionality reduction methods** are implemented and compared:
-
-- PCA
-- RSVD
-- Autoencoder (AE)
-- Gaussian Random Projection (GRP)
-- Sparse Random Projection (SRP)
-- JL-Hadamard
+FHE enables biometric matching directly on encrypted data, providing end-to-end template protection. However, FHE introduces substantial computational overhead. We show that compressing face embeddings _before encryption_ can significantly reduce homomorphic computation time while preserving verification accuracy.
 
 ---
 

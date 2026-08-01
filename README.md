@@ -1,8 +1,25 @@
 # Comparison of Unsupervised Dimensionality Reduction Methods for Fully Homomorphic Encrypted Facial Verification
 
-This repository contains codes for the paper:
+This repository contains the code accompanying the paper:
 
-**“Comparison of Unsupervised Dimensionality Reduction Methods for Fully Homomorphic Encrypted Facial Verification”**, accepted at IWBF 2026.
+> **Heitor Pavani Nolla and André Leon S. Gradvohl.**  
+> *Comparison of Unsupervised Dimensionality Reduction Methods for Fully Homomorphic Encrypted Facial Verification.*  
+> In **Proceedings of the 2026 14th International Workshop on Biometrics and Forensics (IWBF)**, pp. 1–6, 2026.  
+> DOI: https://doi.org/10.1109/IWBF68042.2026.11558161
+
+If you use this repository in your research, please cite:
+
+```bibtex
+@INPROCEEDINGS{11558161,
+  author={Nolla, Heitor Pavani and Gradvohl, André Leon S.},
+  booktitle={2026 14th International Workshop on Biometrics and Forensics (IWBF)},
+  title={Comparison of Unsupervised Dimensionality Reduction Methods for Fully Homomorphic Encrypted Facial Verification},
+  year={2026},
+  pages={1-6},
+  keywords={Biometrics;Dimensionality reduction;Accuracy;Faces;Printing;Timing;Training;Homomorphic encryption;Vectors;Optimization;homomorphic encryption;dimensionality reduction;face verification},
+  doi={10.1109/IWBF68042.2026.11558161}
+}
+```
 
 We systematically evaluate how unsupervised dimensionality reduction techniques impact **accuracy** and **computational efficiency** in a **Fully Homomorphic Encryption (FHE)**-based face verification pipeline.
 
@@ -10,42 +27,53 @@ We systematically evaluate how unsupervised dimensionality reduction techniques 
 
 ## Overview
 
-FHE enables biometric matching directly on encrypted data, providing end-to-end template protection. However, FHE introduces substantial computational overhead. We show that compressing face embeddings _before encryption_ can significantly reduce homomorphic computation time while preserving verification accuracy.
+FHE enables biometric matching directly on encrypted data, providing end-to-end template protection. However, FHE introduces substantial computational overhead. We show that compressing face embeddings *before encryption* can significantly reduce homomorphic computation time while preserving verification accuracy.
 
----
-
-## Running the Codes
+## Running the Code
 
 ### Docker
 
-We provide a Docker image with Pytorch and GPU support. You may build the image by executing:
+We provide a Docker image with PyTorch and GPU support. You can build the image by executing:
 
 ```bash
 docker build -t fhe-dim-reduction .
 ```
 
-And run it with:
+Then run it with:
 
 ```bash
 docker run -it --rm --gpus all -v $(pwd):/app fhe-dim-reduction
 ```
 
-Please, ensure your NVIDIA drivers are updated and Docker is installed.
-The image runs on CUDA 13.0. If compatibility issues arise, you may find versions which match your drivers [here](https://hub.docker.com/r/pytorch/pytorch/).
+Please ensure your NVIDIA drivers are up to date and Docker is installed.
 
-From inside of the image, all of the experiments are located in the `scripts` folder. You may run them by executing:
+The image runs on CUDA 13.0. If compatibility issues arise, you can find PyTorch images matching your CUDA version here:
+
+https://hub.docker.com/r/pytorch/pytorch/
+
+From inside the container, all experiments are located in the `scripts` folder. You can reproduce the paper results by running:
 
 ```bash
 python scripts/reproduce_paper_results.py
 ```
 
-### Local Python Install
+### Local Python Installation
 
-If you choose to not use Docker, you can just create a virtual environment and download the required packages from the `requirements.txt` file. From there, merely run the scripts in the `/scripts` folder. You may run our exact pipeline by running `reproduce_paper_results.py`, but beware that the experiments may take a long time to finish.
+If you prefer not to use Docker, create a virtual environment and install the required packages listed in `requirements.txt`.
 
-We recommend `Python >3.12` for these codes. Specifically, we used version `3.12.7` and [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main) as a package manager  
+Then run the scripts in the `scripts` directory. To reproduce the complete experimental pipeline, execute:
 
+```bash
+python scripts/reproduce_paper_results.py
+```
+
+Note that the experiments may take a considerable amount of time to complete.
+
+We recommend **Python 3.12 or newer**. Our experiments were conducted using **Python 3.12.7** with **Miniconda** as the package manager.
 
 ## Contact Information
 
-For questions about this work, feel free to contact Heitor Nolla at [LinkedIn](https://www.linkedin.com/in/heitor-nolla/) or email: h173233@dac.unicamp.br
+For questions about this work, feel free to contact **Heitor Nolla**:
+
+- LinkedIn: https://www.linkedin.com/in/heitor-nolla/
+- Email: h173233@dac.unicamp.br
